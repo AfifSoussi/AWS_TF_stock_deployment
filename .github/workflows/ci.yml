@@ -36,7 +36,7 @@ jobs:
       - name: Build Docker Image
         id: build
         run: |
-          docker build -t ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:pipeline -f ./app/dockerfile ./app
+          docker build -t ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:pipeline -f ./exchange-rate/dockerfile ./app
         continue-on-error: false
 
       # Step 5: Push the Docker image if build was successful
@@ -80,7 +80,7 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
       with:
-        terraform_version : 0.12.31
+        terraform_version : 1.9.6
 
     # check installed version
     - name: Terraform version

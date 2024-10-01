@@ -11,7 +11,7 @@ BASE_CURRENCY = 'USD'  # Base currency for exchange rates
 # AWS S3 configuration
 S3_BUCKET = os.getenv('S3_BUCKET')  # S3 bucket name from environment variables
 JSON_FILE_KEY = 'exchange_rate_data.json'  # S3 key for JSON file
-HTML_FILE_KEY = 'exchange_rate_table.html'  # S3 key for HTML file
+HTML_FILE_KEY = 'index.html'  # S3 key for HTML file
 
 # Initialize S3 client
 s3_client = boto3.client('s3')

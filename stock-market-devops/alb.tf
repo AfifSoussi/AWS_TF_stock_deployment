@@ -24,17 +24,6 @@ resource "aws_alb_target_group" "app" {
     }
 }
 
-# # ALB Listener
-# resource "aws_alb_listener" "front_end" {
-#   load_balancer_arn = aws_alb.main.id
-#   port              = var.app_port
-#   protocol          = "HTTP"
-
-#   default_action {
-#     target_group_arn = aws_alb_target_group.app.id
-#     type             = "forward"
-#   }
-# }
 
 # ALB Listener (Updated to redirect to S3 static website URL)
 resource "aws_alb_listener" "front_end" {

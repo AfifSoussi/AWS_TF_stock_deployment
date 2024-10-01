@@ -1,4 +1,4 @@
-# S3 bucket creation (without ACLs, public access controlled via policy)
+# S3 bucket creation (with website configuration)
 resource "aws_s3_bucket" "html_bucket" {
   bucket = "my-exchange-rate-html-bucket"
 
@@ -21,6 +21,7 @@ resource "aws_s3_bucket_website_configuration" "hosting" {
   }
 }
 
+# Public access block (allow public access)
 resource "aws_s3_bucket_public_access_block" "html_bucket_access" {
   bucket = aws_s3_bucket.html_bucket.id
 
@@ -48,7 +49,7 @@ resource "aws_s3_bucket_policy" "html_bucket_policy" {
   })
 }
 
-# VPC Endpoint for S3 access
+# VPC Endpoint for S3 access 
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"

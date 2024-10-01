@@ -60,11 +60,12 @@ jobs:
           echo "Build failed. Please check the logs."
 
 
-  terraform_ecs:
+  ecs_terraform:
     name: 'Terraform'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: production
+    needs: build_docker 
 
     # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
     defaults:

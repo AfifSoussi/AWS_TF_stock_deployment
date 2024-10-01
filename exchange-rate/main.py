@@ -1,14 +1,20 @@
 import requests
 import json
+import boto3
 from datetime import datetime
+import os
 
 # Coinbase API configuration
 API_URL = 'https://api.coinbase.com/v2/exchange-rates'
 BASE_CURRENCY = 'USD'  # Base currency for exchange rates
 
-# Local file configuration
-LOCAL_JSON_FILE = 'exchange_rate_data.json'
-LOCAL_HTML_FILE = 'exchange_rate_table.html'
+# AWS S3 configuration
+S3_BUCKET = os.getenv('S3_BUCKET')  # S3 bucket name from environment variables
+JSON_FILE_KEY = 'exchange_rate_data.json'  # S3 key for JSON file
+HTML_FILE_KEY = 'exchange_rate_table.html'  # S3 key for HTML file
+
+# Initialize S3 client
+s3_client = boto3.client('s3')
 
 def get_exchange_rate_data():
     """Fetch exchange rate data from Coinbase API."""
@@ -60,20 +66,28 @@ def generate_html(data):
     """
     return html_content
 
-def save_to_local(data, html_content):
-    """Save the extracted data and HTML page locally."""
+def save_to_s3(data, html_content):
+    """Save the extracted data and HTML page to S3."""
     try:
-        # Save JSON data
-        with open(LOCAL_JSON_FILE, 'w') as json_file:
-            json.dump(data, json_file, indent=4)
-        print(f"JSON data successfully saved locally at {LOCAL_JSON_FILE}")
+        # Save JSON data to S3
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=JSON_FILE_KEY,
+            Body=json.dumps(data, indent=4),
+            ContentType='application/json'
+        )
+        print(f"JSON data successfully saved to S3 at {S3_BUCKET}/{JSON_FILE_KEY}")
         
-        # Save HTML page
-        with open(LOCAL_HTML_FILE, 'w') as html_file:
-            html_file.write(html_content)
-        print(f"HTML page successfully saved locally at {LOCAL_HTML_FILE}")
+        # Save HTML page to S3
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=HTML_FILE_KEY,
+            Body=html_content,
+            ContentType='text/html'
+        )
+        print(f"HTML page successfully saved to S3 at {S3_BUCKET}/{HTML_FILE_KEY}")
     except Exception as e:
-        print(f"Error saving files locally: {e}")
+        print(f"Error saving files to S3: {e}")
 
 def main():
     # Step 1: Download the dataset
@@ -87,8 +101,8 @@ def main():
         # Step 3: Generate an HTML table
         html_content = generate_html(relevant_data)
 
-        # Step 4: Save the extracted data and HTML page locally
-        save_to_local(relevant_data, html_content)
+        # Step 4: Save the extracted data and HTML page to S3
+        save_to_s3(relevant_data, html_content)
     else:
         print("No data to save.")
 

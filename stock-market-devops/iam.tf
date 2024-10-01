@@ -1,6 +1,6 @@
 # ECS Task Execution Role 
 resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "role-name"
+  name = "ecs-task-execution-role-cb-cluster"
  
   assume_role_policy = <<EOF
 {
@@ -21,7 +21,7 @@ EOF
 
 # ECS Task Role (Updated)
 resource "aws_iam_role" "ecs_task_role" {
-  name = "role-name-task"
+  name = "ecs-task-role-cb-app"
  
   assume_role_policy = <<EOF
 {

@@ -36,7 +36,7 @@ jobs:
       - name: Build Docker Image
         id: build
         run: |
-          docker build -t ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:pipeline -f ./exchange-rate/dockerfile ./app
+          docker build --no-cache -t ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:pipeline ./exchange-rate
         continue-on-error: false
 
       # Step 5: Push the Docker image if build was successful

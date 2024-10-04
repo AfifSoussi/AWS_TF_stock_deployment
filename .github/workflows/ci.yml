@@ -128,7 +128,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   get_alb_arns:
-    name: 'Get ALB and Target Group ARNs from Terraform'
+    name: 'Get ALB and Target Group ARN'
     runs-on: ubuntu-latest
     needs: ecs_terraform
     steps:

@@ -7,16 +7,16 @@ terraform {
 
 
   backend "s3" {
-    bucket = "terraform-afif-states"
-    key    = "states/terraform-test.tfstate"
-    region = "us-east-1"
-    encrypt    = true
+    bucket  = "terraform-afif-states"
+    key     = "states/terraform-test.tfstate"
+    region  = "us-east-1"
+    encrypt = true
   }
 }
 
 provider "aws" {
-  profile = "default"
-  region  = "eu-central-1"
+  profile                 = "default"
+  region                  = "eu-central-1"
   shared_credentials_file = "C:/Users/Soussi/.aws/credentials"
 }
 

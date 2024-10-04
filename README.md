@@ -1,10 +1,11 @@
 # DevOps Project: Stock Exchange Data Processing with ECS, S3, and Terraform
-This project demonstrates the automation of a Dockerized application using AWS services (ECS, S3) and Terraform for infrastructure provisioning. The system ingests, processes, and displays stock exchange data. The deployment pipeline is managed using GitLab CI.
+This project demonstrates the automation of a Dockerized application using AWS services (ECS, S3) and Terraform for infrastructure provisioning. The system ingests, processes, and displays stock exchange data. The deployment pipeline is managed using GitLab CI and supports Blue-Green Deployment for seamless updates.
 # Overview
 ## Key Components:
   * ECS (Elastic Container Service): Orchestrates Docker containers, running tasks to fetch stock exchange data.
   * S3 (Simple Storage Service): Used for data storage and static website hosting.
   * Terraform: Manages the infrastructure deployment for ECS, S3, and other AWS resources.
+  * Application Load Balancer (ALB): Routes traffic between the Blue and Green environments, allowing controlled deployment and rollback.
   * Python: Handles the data ingestion and processing logic.
   * Docker: Containers the Python application and its dependencies.
 
@@ -20,7 +21,12 @@ terraform init
 terraform apply
 ```
 ### Access the website 
-http://my-exchange-rate-html-bucket.s3-website.eu-central-1.amazonaws.com
+with load balancer
+http://cb-load-balancer-1550563592.eu-central-1.elb.amazonaws.com
+Blue URL
+http://my-exchange-rate-blue-bucket.s3-website.eu-central-1.amazonaws.com
+green URL
+http://my-exchange-rate-blue-bucket.s3-website.eu-central-1.amazonaws.com
 
 ## Execution Flow
   * ECS runs the Docker container to fetch and process stock exchange data.
@@ -29,7 +35,30 @@ http://my-exchange-rate-html-bucket.s3-website.eu-central-1.amazonaws.com
   * Terraform manages the AWS infrastructure provisioning.
   * GitLab CI handles the continuous integration and deployment of the Docker image and Terraform infrastructure.
 
+## Blue-Green Deployment Strategy
+The project follows a Blue-Green Deployment strategy to ensure zero-downtime updates and safe rollbacks in case of errors. This strategy utilizes two distinct environments:
 
+  * Blue (Production): The current live environment serving user traffic.
+  * Green (Testing): The environment where new versions of the application are deployed and tested.
+### Deployment Flow:
+  * The ALB (Application Load Balancer) directs traffic between Blue and Green environments.
+  * Initially, all traffic is routed to the Blue environment.
+  * The new version of the application is deployed to the Green environment. After testing and validation, traffic is gradually switched from Blue to Green using the ALB.
+  * If any issues arise, the ALB can easily switch back to Blue for a seamless rollback.
+### Key Components of the Blue-Green Deployment:
+  * ECS Task Definitions: Separate task definitions for Blue and Green environments manage the different application versions.
+  * S3 Buckets: Two S3 buckets—my-exchange-rate-blue-html-bucket and my-exchange-rate-green-html-bucket—are used to store processed data and host the static website for each environment.
+  * ALB: The ALB manages traffic between Blue and Green ECS services using listener rules that forward traffic based on path patterns (/green for testing, / for production).
+
+## CI/CD Pipeline Stages
+The pipeline, managed with GitLab CI, is structured to ensure proper testing and validation at each stage before the final switch to production.
+
+  * Python Lint and Tests: Lints the code using tools like flake8 and black and runs unit tests to ensure code quality.
+  * Build and Push Docker Image: Builds the Docker image for the application and pushes it to the GitHub Container Registry (GHCR) with a version tag.
+  * Terraform Infrastructure Deployment: Deploys the infrastructure, including ECS services for both Blue and Green environments, and configures the S3 buckets.
+  * Test Green Environment: Once the Green environment is deployed, automated health checks verify that the service is functioning correctly.
+  * Promote Green to Production: After successful tests, traffic is switched to the Green environment using the ALB, promoting it to production.
+  * Rollback to Blue (if necessary):If tests fail, the ALB is used to immediately route traffic back to the Blue environment, ensuring zero downtime.
 
 # AWS Architecture
 ### Data Ingestion Layer:
@@ -41,9 +70,7 @@ http://my-exchange-rate-html-bucket.s3-website.eu-central-1.amazonaws.com
 ### Orchestration & Infrastructure Layer:
   * Terraform: Used to define and automate the provisioning of ECS, S3, and other necessary AWS resources.
   * ECS: Manages the orchestration of the Docker container that processes the data.
-### CI/CD Pipeline:
-  * GitLab CI: Automates the deployment process, building the Docker image, pushing it to GitHub Container Registry (GHCR), and deploying the infrastructure using Terraform
-  .
+
 ### Security and authentication:
   * IAM Role: The ECS task assumes an IAM role with permissions to access S3, ensuring no hardcoded credentials are used in the application.
   * Boto3 SDK: The application uses the boto3 SDK to interact with AWS services, leveraging the IAM role for secure and seamless access to S3.
@@ -65,10 +92,7 @@ http://my-exchange-rate-html-bucket.s3-website.eu-central-1.amazonaws.com
   * An ECS task was created to pull the Docker image from GHCR and run it on a Fargate instance. This task fetches and processes stock exchange data.
   * Currently, the task is triggered manually, but it can be scheduled using CloudWatch Events for automation in the future.
 ### 5- CI/CD Pipeline
-Implemented a GitLab CI pipeline with two jobs:
-  * Build and Push Docker Image: Builds the Docker container and pushes it to GHCR.
-  * Terraform Infrastructure Deployment: Deploys the infrastructure, ensuring the ECS task is orchestrated and the S3 bucket is correctly configured.
-The Terraform job depends on the successful completion of the Docker build job.
-## Future Improvements
-  * EventBridge Scheduling: While currently not implemented, AWS EventBridge can be used in the future to run the ECS task on a schedule (e.g., daily).
+  * A GitLab CI pipeline handles the entire deployment process, from building the Docker image to deploying the infrastructure with Terraform.
+  * Multiple stages in the pipeline ensure that both the code and infrastructure are tested before any traffic is switched to the Green environment.
+## 6- Future Improvements
   * TLS for Security: The application is running on port 80 over HTTP, with no TLS security. In the future, a TLS certificate can be added for secure communication.

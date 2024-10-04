@@ -1,19 +1,49 @@
-name: Build and Push Docker Image
+name: Build and Deploy with Blue-Green Strategy
 
 on:
   push:
     branches: [main]
-
   pull_request:
     branches: [main]
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
 
 jobs:
+  python_lint_test:
+    name: 'Python Lint and Tests'
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      # Step 3: Install dependencies (if you have a requirements.txt)
+      - name: Install Dependencies
+        run: |
+          pip install -r ./exchange-rate/requirements.txt
+          pip install flake8 black pytest
+
+      # Step 4: Lint check with Flake8
+      - name: Lint with Flake8
+        run: flake8 ./exchange-rate
+
+      # Step 5: Code formatting check with Black
+      - name: Code Formatting with Black
+        run: black --check ./exchange-rate
+
   build_docker:
     runs-on: ubuntu-latest
-    #important to read and write packages on ghcr
+    needs: python_lint_test
     permissions:
-        contents: read
-        packages: write
+      contents: read
+      packages: write
     steps:
       # Step 1: Checkout the repository
       - name: Checkout Code
@@ -28,102 +58,122 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          #replace harcoding username as i'm using same account
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      # Step 4: Build the Docker image
+      # Step 4: Build the Docker image with version tag
       - name: Build Docker Image
         id: build
         run: |
-          docker build --no-cache -t ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:pipeline ./exchange-rate
-        continue-on-error: false
+          IMAGE_TAG=$(git rev-parse --short HEAD)
+          docker build --no-cache -t ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:$IMAGE_TAG ./exchange-rate
+          echo "::set-output name=image::$IMAGE_TAG"
 
       # Step 5: Push the Docker image if build was successful
       - name: Push Docker Image
         if: success()
         run: |
-          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:pipeline
-        continue-on-error: false
-
-      # Step 6: Tag the image with 'latest' after successful push
-      - name: Tag Docker Image
-        if: success()
-        run: |
-          docker tag ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:pipeline ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:latest
-          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:latest
-
-      # Step 7: fallback control if the build or push fails
-      - name: Send Notification on Failure
-        if: failure()
-        run: |
-          echo "Build failed. Please check the logs."
-
+          IMAGE_TAG=$(git rev-parse --short HEAD)
+          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:$IMAGE_TAG
 
   ecs_terraform:
-    name: 'Terraform'
+    name: 'Terraform Deploy'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    needs: build_docker
     environment: production
-    needs: build_docker 
-
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    timeout-minutes: 40
     defaults:
       run:
         shell: bash
-
     steps:
-    # Checkout the repository to the GitHub Actions runner
-    - name: Checkout
-      uses: actions/checkout@v2
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-      with:
-        terraform_version : 1.9.6
+      # Install the latest version of Terraform CLI
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.9.6
 
-    # check installed version
-    - name: Terraform version
-      run: terraform --version
-      
-    - name: Terraform init
-      run: terraform init
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TF_ACTION_WORKING_DIR: '.'
-        AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # Initialize Terraform
+      - name: Terraform init
+        run: terraform init
+        env:
+          AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    - name: Terraform Validate
-      run: terraform validate
+      # Validate Terraform configuration
+      - name: Terraform Validate
+        run: terraform validate
 
-    # Generates an execution plan for Terraform
-    # - name: Terraform destroy
-    #   run: terraform destroy -auto-approve
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #     TF_ACTION_WORKING_DIR: '.'
-    #     AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
-    #     AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        
-    # - name: wait 2 minutes for refresh
-    #   run: sleep 120
-      
-    # Generates an execution plan for Terraform
-    - name: Terraform plan
-      run: terraform plan
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TF_ACTION_WORKING_DIR: '.'
-        AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # Check Terraform format
+      - name: Terraform Format Check
+        run: terraform fmt -check
 
-    # apply changes
-    - name: Terraform apply
-      run: terraform apply -auto-approve
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TF_ACTION_WORKING_DIR: '.'
-        AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # Plan Terraform changes
+      - name: Terraform plan
+        run: terraform plan
+        env:
+          AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Apply the changes to deploy the Green environment
+      - name: Terraform apply
+        run: |
+          IMAGE_TAG=$(git rev-parse --short HEAD)
+          terraform apply -var="image_tag=$IMAGE_TAG" -auto-approve
+        env:
+          AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  get_alb_arns:
+    name: 'Get ALB and Target Group ARNs from Terraform'
+    runs-on: ubuntu-latest
+    needs: ecs_terraform
+    steps:
+      # Fetch Terraform outputs for ALB and target group ARNs
+      - name: Get Blue and Green Target Group ARNs
+        id: alb_outputs
+        run: |
+          BLUE_TG_ARN=$(terraform output -raw Blue-Target-Group-ARN)
+          GREEN_TG_ARN=$(terraform output -raw Green-Target-Group-ARN)
+          ALB_LISTENER_ARN=$(terraform output -raw ALB-Listener-ARN)
+          echo "::set-output name=blue_tg::$BLUE_TG_ARN"
+          echo "::set-output name=green_tg::$GREEN_TG_ARN"
+          echo "::set-output name=alb_listener::$ALB_LISTENER_ARN"
+
+  test_green:
+    name: 'Test Green Environment'
+    runs-on: ubuntu-latest
+    needs: get_alb_arns
+    steps:
+      # Simple health check to verify Green environment
+      - name: Health Check for Green Environment
+        run: |
+          GREEN_URL=$(aws elbv2 describe-target-health --target-group-arn ${{ needs.get_alb_arns.outputs.green_tg }} --query 'TargetHealthDescriptions[0].TargetHealth.State' --output text)
+          echo "Health check result: $GREEN_URL"
+          if [ "$GREEN_URL" != "healthy" ]; then exit 1; fi
+
+  promote_green:
+    name: 'Promote Green to Blue (Production)'
+    runs-on: ubuntu-latest
+    needs: test_green
+    steps:
+      # Promote Green to Blue by switching ALB traffic to Green target group
+      - name: Promote Green to Blue
+        run: |
+          echo "Switching traffic from Blue to Green..."
+          aws elbv2 modify-listener --listener-arn ${{ needs.get_alb_arns.outputs.alb_listener }} --default-actions Type=forward,TargetGroupArn=${{ needs.get_alb_arns.outputs.green_tg }}
+
+  rollback:
+    name: 'Rollback to Blue'
+    runs-on: ubuntu-latest
+    needs: test_green
+    if: failure()
+    steps:
+      # Rollback to Blue by switching ALB traffic back to Blue target group
+      - name: Rollback to Blue
+        run: |
+          echo "Tests failed, rolling back to Blue..."
+          aws elbv2 modify-listener --listener-arn ${{ needs.get_alb_arns.outputs.alb_listener }} --default-actions Type=forward,TargetGroupArn=${{ needs.get_alb_arns.outputs.blue_tg }}

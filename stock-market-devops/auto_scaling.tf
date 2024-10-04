@@ -1,23 +1,24 @@
-# Define the autoscaling target for ECS
-resource "aws_appautoscaling_target" "target" {
-  service_namespace  = "ecs"
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.stock_exchange_service.name}"
+# Autoscaling for Blue (Production) ECS Service
+resource "aws_appautoscaling_target" "blue_target" {
+  max_capacity       = 2
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.blue_stock_exchange_service.name}"
   scalable_dimension = "ecs:service:DesiredCount"
-  min_capacity       = 3
-  max_capacity       = 6
+  service_namespace  = "ecs"
 }
 
-# Autoscaling policy to scale up (increase capacity)
-resource "aws_appautoscaling_policy" "up" {
-  name               = "cb_scale_up"
-  service_namespace  = "ecs"
-  resource_id        = aws_appautoscaling_target.target.resource_id
-  scalable_dimension = aws_appautoscaling_target.target.scalable_dimension
+# Scaling Policy for Blue ECS Service - Scale Up
+resource "aws_appautoscaling_policy" "blue_scale_up" {
+  name               = "blue-scale-up"
+  policy_type        = "StepScaling"
+  resource_id        = aws_appautoscaling_target.blue_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.blue_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.blue_target.service_namespace
 
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
-    cooldown                = 60
-    metric_aggregation_type = "Maximum"
+    cooldown               = 60
+    metric_aggregation_type = "Average"
 
     step_adjustment {
       metric_interval_lower_bound = 0
@@ -26,17 +27,18 @@ resource "aws_appautoscaling_policy" "up" {
   }
 }
 
-# Autoscaling policy to scale down (decrease capacity)
-resource "aws_appautoscaling_policy" "down" {
-  name               = "cb_scale_down"
-  service_namespace  = "ecs"
-  resource_id        = aws_appautoscaling_target.target.resource_id
-  scalable_dimension = aws_appautoscaling_target.target.scalable_dimension
+# Scaling Policy for Blue ECS Service - Scale Down
+resource "aws_appautoscaling_policy" "blue_scale_down" {
+  name               = "blue-scale-down"
+  policy_type        = "StepScaling"
+  resource_id        = aws_appautoscaling_target.blue_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.blue_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.blue_target.service_namespace
 
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
-    cooldown                = 60
-    metric_aggregation_type = "Maximum"
+    cooldown               = 60
+    metric_aggregation_type = "Average"
 
     step_adjustment {
       metric_interval_lower_bound = 0
@@ -45,40 +47,51 @@ resource "aws_appautoscaling_policy" "down" {
   }
 }
 
-# CloudWatch alarm to trigger scale up based on high CPU utilization
-resource "aws_cloudwatch_metric_alarm" "service_cpu_high" {
-  alarm_name          = "cb_cpu_utilization_high"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/ECS"
-  period              = 60
-  statistic           = "Average"
-  threshold           = 85
-
-  dimensions = {
-    ClusterName = aws_ecs_cluster.main.name
-    ServiceName = aws_ecs_service.stock_exchange_service.name
-  }
-
-  alarm_actions = [aws_appautoscaling_policy.up.arn]
+# Autoscaling for Green (Testing) ECS Service
+resource "aws_appautoscaling_target" "green_target" {
+  max_capacity       = 2
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.green_stock_exchange_service.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
 }
 
-# CloudWatch alarm to trigger scale down based on low CPU utilization
-resource "aws_cloudwatch_metric_alarm" "service_cpu_low" {
-  alarm_name          = "cb_cpu_utilization_low"
-  comparison_operator = "LessThanOrEqualToThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/ECS"
-  period              = 60
-  statistic           = "Average"
-  threshold           = 10
+# Scaling Policy for Green ECS Service - Scale Up
+resource "aws_appautoscaling_policy" "green_scale_up" {
+  name               = "green-scale-up"
+  policy_type        = "StepScaling"
+  resource_id        = aws_appautoscaling_target.green_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.green_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.green_target.service_namespace
 
-  dimensions = {
-    ClusterName = aws_ecs_cluster.main.name
-    ServiceName = aws_ecs_service.stock_exchange_service.name
+  step_scaling_policy_configuration {
+    adjustment_type         = "ChangeInCapacity"
+    cooldown               = 60
+    metric_aggregation_type = "Average"
+
+    step_adjustment {
+      metric_interval_lower_bound = 0
+      scaling_adjustment          = 1
+    }
   }
+}
 
-  alarm_actions = [aws_appautoscaling_policy.down.arn]
+# Scaling Policy for Green ECS Service - Scale Down
+resource "aws_appautoscaling_policy" "green_scale_down" {
+  name               = "green-scale-down"
+  policy_type        = "StepScaling"
+  resource_id        = aws_appautoscaling_target.green_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.green_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.green_target.service_namespace
+
+  step_scaling_policy_configuration {
+    adjustment_type         = "ChangeInCapacity"
+    cooldown               = 60
+    metric_aggregation_type = "Average"
+
+    step_adjustment {
+      metric_interval_lower_bound = 0
+      scaling_adjustment          = -1
+    }
+  }
 }

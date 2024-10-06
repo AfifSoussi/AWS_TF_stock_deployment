@@ -13,28 +13,22 @@ resource "aws_ecs_task_definition" "blue_stock_exchange_task" {
     cpu                      = var.fargate_cpu
     memory                   = var.fargate_memory
 
-    container_definitions = jsonencode([
-        {
-            name      = "stock-exchange-container"                     # Name of the container
-            image     = "${var.app_image}:${var.image_tag}"      # Use the stock exchange container from GitHub Container Registry
-            essential = true
-            cpu       = 256
-            memory    = 512
-            portMappings = [
-                {
-                    containerPort = 80                                # Port mapping (adjust as needed)
-                    hostPort      = 80
-                    protocol      = "tcp"
-                }
-            ]
-            environment = [
-                {
-                    name  = "S3_BUCKET"                               # Override S3_BUCKET for Blue (Production)
-                    value = "my-exchange-rate-blue-bucket"        # Use Blue S3 bucket
-                }
-            ]
-        }
-    ])
+    container_definitions = jsonencode([{
+        name      = "stock-exchange-container"                     # Name of the container
+        image     = "${var.app_image}:${var.image_tag}"            # Use the stock exchange container from GitHub Container Registry
+        essential = true
+        cpu       = 256
+        memory    = 512
+        portMappings = [{
+            containerPort = 80                                    # Port mapping (adjust as needed)
+            hostPort      = 80
+            protocol      = "tcp"
+        }]
+        environment = [{
+            name  = "S3_BUCKET"                                    # Override S3_BUCKET for Blue (Production)
+            value = aws_s3_bucket.blue_bucket.bucket               # Use Blue S3 bucket
+        }]
+    }])
 }
 
 # ECS Task Definition for the Stock Exchange Task (Green - Testing)
@@ -47,28 +41,22 @@ resource "aws_ecs_task_definition" "green_stock_exchange_task" {
     cpu                      = var.fargate_cpu
     memory                   = var.fargate_memory
 
-    container_definitions = jsonencode([
-        {
-            name      = "stock-exchange-container"                     # Name of the container
-            image     = "${var.app_image}:${var.image_tag}"      # Use the stock exchange container from GitHub Container Registry
-            essential = true
-            cpu       = 256
-            memory    = 512
-            portMappings = [
-                {
-                    containerPort = 80                                # Port mapping (adjust as needed)
-                    hostPort      = 80
-                    protocol      = "tcp"
-                }
-            ]
-            environment = [
-                {
-                    name  = "S3_BUCKET"                               # Override S3_BUCKET for Green (Testing)
-                    value = "my-exchange-rate-green-bucket"       # Use Green S3 bucket
-                }
-            ]
-        }
-    ])
+    container_definitions = jsonencode([{
+        name      = "stock-exchange-container"                     # Name of the container
+        image     = "${var.app_image}:${var.image_tag}"            # Use the stock exchange container from GitHub Container Registry
+        essential = true
+        cpu       = 256
+        memory    = 512
+        portMappings = [{
+            containerPort = 80                                    # Port mapping (adjust as needed)
+            hostPort      = 80
+            protocol      = "tcp"
+        }]
+        environment = [{
+            name  = "S3_BUCKET"                                    # Override S3_BUCKET for Green (Testing)
+            value = aws_s3_bucket.green_bucket.bucket              # Use Green S3 bucket
+        }]
+    }])
 }
 
 # ECS Service for Blue (Production)
@@ -79,11 +67,8 @@ resource "aws_ecs_service" "blue_stock_exchange_service" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
-  load_balancer {
-    target_group_arn = aws_alb_target_group.blue_app.arn
-    container_name   = "stock-exchange-container"
-    container_port   = 80
-  }
+  # Load balancer removed. Now traffic is handled by the S3 bucket endpoint.
+  # No need for ALB target group reference.
 
   network_configuration {
     subnets          = aws_subnet.private.*.id
@@ -102,11 +87,8 @@ resource "aws_ecs_service" "green_stock_exchange_service" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
-  load_balancer {
-    target_group_arn = aws_alb_target_group.green_app.arn
-    container_name   = "stock-exchange-container"
-    container_port   = 80
-  }
+  # Load balancer removed. Now traffic is handled by the S3 bucket endpoint.
+  # No need for ALB target group reference.
 
   network_configuration {
     subnets          = aws_subnet.private.*.id

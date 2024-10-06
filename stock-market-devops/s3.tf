@@ -1,3 +1,4 @@
+
 resource "aws_s3_bucket" "blue_bucket" {
   bucket = "my-exchange-rate-blue-bucket"
   website {
@@ -28,23 +29,6 @@ resource "aws_s3_bucket_public_access_block" "blue_html_bucket_access" {
   restrict_public_buckets = false
 }
 
-resource "aws_s3_bucket_policy" "blue_bucket_policy" {
-  bucket = aws_s3_bucket.blue_bucket.id
-
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect    = "Allow",
-        Principal = {
-          "AWS": aws_iam_role.ecs_task_role.arn
-        },
-        Action    = "s3:GetObject",
-        Resource  = "${aws_s3_bucket.blue_bucket.arn}/*"
-      }
-    ]
-  })
-}
 
 
 ######### green bucket #####
@@ -81,7 +65,24 @@ resource "aws_s3_bucket_public_access_block" "green_html_bucket_access" {
 
 
 
+# Policy for Blue S3 Bucket to Allow Public Access
+resource "aws_s3_bucket_policy" "blue_bucket_policy" {
+  bucket = aws_s3_bucket.blue_bucket.id
 
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = "*",
+        Action   = "s3:GetObject",
+        Resource = "${aws_s3_bucket.blue_bucket.arn}/*"
+      }
+    ]
+  })
+}
+
+# Policy for Green S3 Bucket to Allow Public Access
 resource "aws_s3_bucket_policy" "green_bucket_policy" {
   bucket = aws_s3_bucket.green_bucket.id
 
@@ -89,16 +90,15 @@ resource "aws_s3_bucket_policy" "green_bucket_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect    = "Allow",
-        Principal = {
-          "AWS": aws_iam_role.ecs_task_role.arn
-        },
-        Action    = "s3:GetObject",
-        Resource  = "${aws_s3_bucket.green_bucket.arn}/*"
+        Effect = "Allow",
+        Principal = "*",
+        Action   = "s3:GetObject",
+        Resource = "${aws_s3_bucket.green_bucket.arn}/*"
       }
     ]
   })
 }
+
 
 # Output the S3 bucket website URL
 output "blue_website_url" {

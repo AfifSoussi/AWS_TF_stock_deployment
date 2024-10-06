@@ -6,29 +6,18 @@ module "stock-market-devops" {
   blue_green_deployment = true # Enable Blue-Green deployment support
 }
 
-# Output for the Application Load Balancer hostname
-output "alb_hostname" {
-  value       = module.stock-market-devops.App-Load-Balancer-Hostname
-  description = "DNS name of the Application Load Balancer"
+# Output the blue S3 website URL
+output "blue_s3_website_url" {
+  value       = module.stock-market-devops.blue_website_url
+  description = "The URL of the blueS3 website bucket"
 }
 
-# Output the ALB Listener ARN for use in CI/CD
-output "alb_listener_arn" {
-  value       = module.stock-market-devops.ALB-Listener-ARN
-  description = "The ARN of the ALB Listener"
+# Output the green S3 website URL
+output "green_s3_website_url" {
+  value       = module.stock-market-devops.green_website_url
+  description = "The URL of the green S3 website bucket"
 }
 
-# Output the Blue Target Group ARN for Blue-Green deployment
-output "blue_target_group_arn" {
-  value       = module.stock-market-devops.Blue-Target-Group-ARN
-  description = "The ARN of the Blue Target Group for production"
-}
-
-# Output the Green Target Group ARN for Blue-Green deployment
-output "green_target_group_arn" {
-  value       = module.stock-market-devops.Green-Target-Group-ARN
-  description = "The ARN of the Green Target Group for testing"
-}
 
 # Output the AWS region where the resources are deployed
 output "aws_region" {

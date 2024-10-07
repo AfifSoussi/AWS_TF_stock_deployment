@@ -111,20 +111,21 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+      # Fetch and store Green Bucket Health Check ID
+      - name: Store Green Bucket Health Check ID
+        run: |
+          GREEN_HEALTH_CHECK_ID=$(terraform output -raw green_bucket_health_check_id)
+          echo "GREEN_HEALTH_CHECK_ID=$GREEN_HEALTH_CHECK_ID" >> $GITHUB_ENV
+
   test_green:
     name: 'Test Green Environment'
     runs-on: ubuntu-latest
     needs: ecs_terraform
     steps:
-      - name: Fetch Green Bucket Health Check ID
-        id: fetch_health_check_id
-        run: |
-          GREEN_HEALTH_CHECK_ID=$(terraform output -raw green_bucket_health_check_id)
-          echo "::set-output name=health_check_id::$GREEN_HEALTH_CHECK_ID"
-          
       - name: Check Health of Green Bucket
         run: |
-          HEALTH_STATUS=$(aws route53 get-health-check-status --health-check-id ${{ steps.fetch_health_check_id.outputs.health_check_id }} --query 'HealthCheckObservations[].StatusReport.Status' --output text)
+          echo "Using Health Check ID: ${{ env.GREEN_HEALTH_CHECK_ID }}"
+          HEALTH_STATUS=$(aws route53 get-health-check-status --health-check-id ${{ env.GREEN_HEALTH_CHECK_ID }} --query 'HealthCheckObservations[].StatusReport.Status' --output text)
           echo "Health check statuses: $HEALTH_STATUS"
           
           # Check if all statuses contain "HTTP Status Code 200, OK"

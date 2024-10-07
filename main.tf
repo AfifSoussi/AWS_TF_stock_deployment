@@ -1,9 +1,9 @@
 module "stock-market-devops" {
-  source                = "./stock-market-devops"
-  aws_region            = "eu-central-1"
-  vpc_cidr              = "10.10.0.0/16"
-  app_image             = "ghcr.io/afifsoussi/stock-exchange"
-  bDeployBlue = true  # Set to true for blue deployment, false for green deployment
+  source      = "./stock-market-devops"
+  aws_region  = "eu-central-1"
+  vpc_cidr    = "10.10.0.0/16"
+  app_image   = "ghcr.io/afifsoussi/stock-exchange"
+  bDeployBlue = true # Set to true for blue deployment, false for green deployment
 }
 
 # Output the blue S3 website URL

@@ -145,7 +145,7 @@ jobs:
       # Delete content of green bucket
       - name: Delete Content of Green Bucket
         run: |
-          aws s3 rm s3://my-exchange-rate-green-bucket --recursive
+          #aws s3 rm s3://my-exchange-rate-green-bucket --recursive
           echo "Green bucket content deleted."
 
       # Apply with bDeployBlue=true if the health check passes

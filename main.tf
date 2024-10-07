@@ -3,7 +3,7 @@ module "stock-market-devops" {
   aws_region            = "eu-central-1"
   vpc_cidr              = "10.10.0.0/16"
   app_image             = "ghcr.io/afifsoussi/stock-exchange"
-  blue_green_deployment = true # Enable Blue-Green deployment support
+  bDeployBlue = true  # Set to true for blue deployment, false for green deployment
 }
 
 # Output the blue S3 website URL
@@ -23,4 +23,18 @@ output "green_s3_website_url" {
 output "aws_region" {
   value       = module.stock-market-devops.aws_region
   description = "The AWS region where the infrastructure is deployed"
+}
+
+
+
+# Import the health check ID for the blue S3 bucket 
+output "blue_bucket_health_check_id" {
+  value       = module.stock-market-devops.blue_bucket_health_check_id
+  description = "The Route53 health check ID for the blue S3 bucket"
+}
+
+# Import the health check ID for the green S3 bucke
+output "green_bucket_health_check_id" {
+  value       = module.stock-market-devops.green_bucket_health_check_id
+  description = "The Route53 health check ID for the green S3 bucket"
 }

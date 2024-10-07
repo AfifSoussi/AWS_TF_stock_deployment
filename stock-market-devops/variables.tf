@@ -55,9 +55,10 @@ variable "fargate_memory" {
     default = "512"
 }
 
-variable "blue_green_deployment" {
-    description = "enable or disable the blue green deployment with zero downtime"
-    default = false
+variable "bDeployBlue" {
+  type        = bool
+  description = "Flag to determine if the deployment should be done on the blue environment"
+  default     = true  # Default to blue, adjust based on your deployment needs
 }
 
 variable "image_tag" {

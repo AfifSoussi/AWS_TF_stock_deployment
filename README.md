@@ -41,15 +41,14 @@ The project follows a Blue-Green Deployment strategy to ensure zero-downtime upd
   * Blue (Production): The current live environment serving user traffic.
   * Green (Testing): The environment where new versions of the application are deployed and tested.
 ### Deployment Flow:
-  * The ALB (Application Load Balancer) directs traffic between Blue and Green environments.
-  * Initially, all traffic is routed to the Blue environment.
-  * The new version of the application is deployed to the Green environment. After testing and validation, traffic is gradually switched from Blue to Green using the ALB.
-  * If any issues arise, the ALB can easily switch back to Blue for a seamless rollback.
+  * The first Terraform deployment applies changes only to the green environment (green S3 bucket and green ECS task).
+  * After deployment, the pipeline waits for 2 minutes, then checks the health status of the green bucket using Route 53 health checks.
+  * If the green bucket passes the health check, the pipeline proceeds to deploy the code to the blue environment (blue S3 bucket and blue ECS task).
+  * The pipeline waits again for 2 minutes, then checks the health status of the blue bucket.
+  * If the blue environment fails its health check, the pipeline rolls back the deployment by reapplying the green deployment.
 ### Key Components of the Blue-Green Deployment:
   * ECS Task Definitions: Separate task definitions for Blue and Green environments manage the different application versions.
   * S3 Buckets: Two S3 buckets—my-exchange-rate-blue-html-bucket and my-exchange-rate-green-html-bucket—are used to store processed data and host the static website for each environment.
-  * ALB: The ALB manages traffic between Blue and Green ECS services using listener rules that forward traffic based on path patterns (/green for testing, / for production).
-
 ## CI/CD Pipeline Stages
 The pipeline, managed with GitLab CI, is structured to ensure proper testing and validation at each stage before the final switch to production.
 

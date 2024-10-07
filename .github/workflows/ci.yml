@@ -6,35 +6,30 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Run every hour
-    - cron: '0 * * * *'
+    # Run daily at midnight (UTC)
+    - cron: '0 0 * * *'
 
 jobs:
   python_lint_test:
     name: 'Python Lint and Tests'
     runs-on: ubuntu-latest
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Step 2: Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.9'
 
-      # Step 3: Install dependencies (if you have a requirements.txt)
       - name: Install Dependencies
         run: |
           pip install -r ./exchange-rate/requirements.txt
           pip install flake8 black pytest
 
-      # Step 4: Lint check with Flake8
       - name: Lint with Flake8
         run: flake8 ./exchange-rate
 
-      # Step 5: Code formatting check with Black
       - name: Code Formatting with Black
         run: black --check ./exchange-rate
 
@@ -45,15 +40,12 @@ jobs:
       contents: read
       packages: write
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Step 2: Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Step 3: Log in to GitHub Container Registry (GHCR)
       - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
@@ -61,7 +53,6 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      # Step 4: Build the Docker image with version tag
       - name: Build Docker Image
         id: build
         run: |
@@ -69,7 +60,6 @@ jobs:
           docker build --no-cache -t ghcr.io/${{ secrets.GHCR_USERNAME }}/stock-exchange:$IMAGE_TAG ./exchange-rate
           echo "::set-output name=image::$IMAGE_TAG"
 
-      # Step 5: Push the Docker image if build was successful
       - name: Push Docker Image
         if: success()
         run: |
@@ -86,94 +76,83 @@ jobs:
       run:
         shell: bash
     steps:
-      # Checkout the repository to the GitHub Actions runner
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Install the latest version of Terraform CLI
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
           terraform_version: 1.9.6
 
-      # Initialize Terraform
       - name: Terraform init
         run: terraform init
         env:
           AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Validate Terraform configuration
       - name: Terraform Validate
         run: terraform validate
 
-      # Check Terraform format
       - name: Terraform Format Check
         run: terraform fmt -check
 
-      # Plan Terraform changes
       - name: Terraform plan
         run: terraform plan
         env:
           AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Apply the changes to deploy the Green environment
-      - name: Terraform apply
+      # Apply with bDeployBlue=false to deploy the Green environment
+      - name: Terraform apply (Green Deploy)
         run: |
           IMAGE_TAG=$(git rev-parse --short HEAD)
-          terraform apply -var="image_tag=$IMAGE_TAG" -auto-approve
+          terraform apply -var="image_tag=$IMAGE_TAG" -var="bDeployBlue=false" -auto-approve
         env:
           AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-  get_alb_arns:
-    name: 'Get ALB and Target Group ARN'
-    runs-on: ubuntu-latest
-    needs: ecs_terraform
-    steps:
-      # Fetch Terraform outputs for ALB and target group ARNs
-      - name: Get Blue and Green Target Group ARNs
-        id: alb_outputs
-        run: |
-          BLUE_TG_ARN=$(terraform output -raw Blue-Target-Group-ARN)
-          GREEN_TG_ARN=$(terraform output -raw Green-Target-Group-ARN)
-          ALB_LISTENER_ARN=$(terraform output -raw ALB-Listener-ARN)
-          echo "::set-output name=blue_tg::$BLUE_TG_ARN"
-          echo "::set-output name=green_tg::$GREEN_TG_ARN"
-          echo "::set-output name=alb_listener::$ALB_LISTENER_ARN"
-
   test_green:
     name: 'Test Green Environment'
     runs-on: ubuntu-latest
-    needs: get_alb_arns
+    needs: ecs_terraform
     steps:
-      # Simple health check to verify Green environment
-      - name: Health Check for Green Environment
+      - name: Fetch Green Bucket Health Check ID
+        id: fetch_health_check_id
         run: |
-          GREEN_URL=$(aws elbv2 describe-target-health --target-group-arn ${{ needs.get_alb_arns.outputs.green_tg }} --query 'TargetHealthDescriptions[0].TargetHealth.State' --output text)
-          echo "Health check result: $GREEN_URL"
-          if [ "$GREEN_URL" != "healthy" ]; then exit 1; fi
+          GREEN_HEALTH_CHECK_ID=$(terraform output -raw green_bucket_health_check_id)
+          echo "::set-output name=health_check_id::$GREEN_HEALTH_CHECK_ID"
+          
+      - name: Check Health of Green Bucket
+      run: |
+        HEALTH_STATUS=$(aws route53 get-health-check-status --health-check-id ${{ steps.fetch_health_check_id.outputs.health_check_id }} --query 'HealthCheckObservations[].StatusReport.Status' --output text)
+        echo "Health check statuses: $HEALTH_STATUS"
+        
+        # Check if all statuses contain "HTTP Status Code 200, OK"
+        if echo "$HEALTH_STATUS" | grep -qv "HTTP Status Code 200, OK"; then
+          echo "Health check failed in at least one region."
+          exit 1
+        else
+          echo "Green bucket is healthy across all regions."
+        fi
+        
+        
 
   promote_green:
-    name: 'Promote Green to Blue (Production)'
+    name: 'Promote Green to Blue (Final Deploy)'
     runs-on: ubuntu-latest
     needs: test_green
     steps:
-      # Promote Green to Blue by switching ALB traffic to Green target group
-      - name: Promote Green to Blue
+      # Delete content of green bucket
+      - name: Delete Content of Green Bucket
         run: |
-          echo "Switching traffic from Blue to Green..."
-          aws elbv2 modify-listener --listener-arn ${{ needs.get_alb_arns.outputs.alb_listener }} --default-actions Type=forward,TargetGroupArn=${{ needs.get_alb_arns.outputs.green_tg }}
+          aws s3 rm s3://my-exchange-rate-green-bucket --recursive
+          echo "Green bucket content deleted."
 
-  rollback:
-    name: 'Rollback to Blue'
-    runs-on: ubuntu-latest
-    needs: test_green
-    if: failure()
-    steps:
-      # Rollback to Blue by switching ALB traffic back to Blue target group
-      - name: Rollback to Blue
+      # Apply with bDeployBlue=true if the health check passes
+      - name: Terraform apply (Promote Green to Blue)
         run: |
-          echo "Tests failed, rolling back to Blue..."
-          aws elbv2 modify-listener --listener-arn ${{ needs.get_alb_arns.outputs.alb_listener }} --default-actions Type=forward,TargetGroupArn=${{ needs.get_alb_arns.outputs.blue_tg }}
+          IMAGE_TAG=$(git rev-parse --short HEAD)
+          terraform apply -var="image_tag=$IMAGE_TAG" -var="bDeployBlue=true" -auto-approve
+        env:
+          AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}

@@ -26,7 +26,7 @@ resource "aws_ecs_task_definition" "blue_stock_exchange_task" {
         }]
         environment = [{
             name  = "S3_BUCKET"                                    # Override S3_BUCKET for Blue (Production)
-            value = aws_s3_bucket.blue_bucket.bucket               # Use Blue S3 bucket
+            value = var.bDeployBlue ? aws_s3_bucket.blue_bucket.bucket : aws_s3_bucket.green_bucket.bucket
         }]
     }])
 }
@@ -54,7 +54,7 @@ resource "aws_ecs_task_definition" "green_stock_exchange_task" {
         }]
         environment = [{
             name  = "S3_BUCKET"                                    # Override S3_BUCKET for Green (Testing)
-            value = aws_s3_bucket.green_bucket.bucket              # Use Green S3 bucket
+            value = aws_s3_bucket.green_bucket.bucket
         }]
     }])
 }

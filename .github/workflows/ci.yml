@@ -111,11 +111,16 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # Fetch and store Green Bucket Health Check ID
       - name: Store Green Bucket Health Check ID
         run: |
+          echo "Attempting to fetch green_bucket_health_check_id..."
           GREEN_HEALTH_CHECK_ID=$(terraform output -raw green_bucket_health_check_id)
+          if [ -z "$GREEN_HEALTH_CHECK_ID" ]; then
+            echo "Error: green_bucket_health_check_id not found."
+            exit 1
+          fi
           echo "GREEN_HEALTH_CHECK_ID=$GREEN_HEALTH_CHECK_ID" >> $GITHUB_ENV
+        
 
   test_green:
     name: 'Test Green Environment'

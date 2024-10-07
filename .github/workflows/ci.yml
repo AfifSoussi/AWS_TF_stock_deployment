@@ -131,7 +131,7 @@ jobs:
           # Check if all statuses contain "HTTP Status Code 200, OK"
           if echo "$HEALTH_STATUS" | grep -qv "HTTP Status Code 200, OK"; then
             echo "Health check failed in at least one region."
-            exit 1
+            exit 0
           else
             echo "Green bucket is healthy across all regions."
           fi

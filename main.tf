@@ -19,14 +19,6 @@ output "green_s3_website_url" {
 }
 
 
-# Output the AWS region where the resources are deployed
-output "aws_region" {
-  value       = module.stock-market-devops.aws_region
-  description = "The AWS region where the infrastructure is deployed"
-}
-
-
-
 # Import the health check ID for the blue S3 bucket 
 output "blue_bucket_health_check_id" {
   value       = module.stock-market-devops.blue_bucket_health_check_id

@@ -59,7 +59,7 @@ resource "aws_ecs_task_definition" "green_stock_exchange_task" {
     }])
 }
 
-# ECS Service for Blue (Production)
+# ECS Service for Blue (Production env)
 resource "aws_ecs_service" "blue_stock_exchange_service" {
   name            = "stock-exchange-service-blue"
   cluster         = aws_ecs_cluster.main.id
@@ -79,7 +79,7 @@ resource "aws_ecs_service" "blue_stock_exchange_service" {
   depends_on = [aws_iam_role_policy_attachment.ecs-task-execution-role-policy-attachment]
 }
 
-# ECS Service for Green (Testing)
+# ECS Service for Green (Testing env)
 resource "aws_ecs_service" "green_stock_exchange_service" {
   name            = "stock-exchange-service-green"
   cluster         = aws_ecs_cluster.main.id

@@ -122,6 +122,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: ecs_terraform
     steps:
+      - name: Wait for Environment to Stabilize
+        run: |
+          echo "Waiting for 5 minutes to allow the environment to stabilize."
+          sleep 300  # Wait for 5 minutes
+
       - name: Check Health of Green Bucket
         run: |
           echo "Using Health Check ID: ${{ env.GREEN_HEALTH_CHECK_ID }}"
